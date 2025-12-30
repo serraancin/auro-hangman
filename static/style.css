@@ -619,6 +619,12 @@ h1 {
     animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
 }
 
+.key-btn.space-btn {
+    width: 120px;
+    font-size: var(--font-xs);
+    letter-spacing: 0.1em;
+}
+
 @keyframes shake {
   10%, 90% { transform: translate3d(-1px, 0, 0); }
   20%, 80% { transform: translate3d(2px, 0, 0); }

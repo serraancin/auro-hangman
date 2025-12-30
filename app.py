@@ -343,7 +343,7 @@ def _ensure_session_learning_info(category, word):
     return info
 
 def get_masked_word(word, guesses):
-    return " ".join([letter if letter in guesses else "_" for letter in word])
+    return " ".join([letter if (letter in guesses or not letter.isalpha()) else "_" for letter in word])
 
 
 def _today_str() -> str:
@@ -388,26 +388,39 @@ def _ensure_daily_game(category: str):
     if not current or current.get("date") != day_str:
         word_data = _daily_word_for(category, day_str)
         learning_info = build_learning_info(word_data, category)
+        
+        word = word_data["word"]
+        initial_guesses = list(set(c.upper() for c in word if not c.isalpha()))
+        
         daily_state[category] = {
             "date": day_str,
             "category": category,
-            "word": word_data["word"],
+            "word": word,
             "hint": word_data["hint"],
-            "guesses": [],
+            "guesses": initial_guesses,
             "attempts_left": 6,
             "game_over": False,
             "win": False,
             "started_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
             "learning": learning_info,
+            "ai_hints_history": [],
         }
         _set_daily_state(daily_state)
 
     refreshed = _get_daily_state()[category]
 
     # Backfill learning info for games that started before curriculum data existed
+    needs_update = False
     if not refreshed.get("learning"):
         word_entry = _lookup_word_entry(category, refreshed.get("word"))
         refreshed["learning"] = build_learning_info(word_entry, category)
+        needs_update = True
+    
+    if "ai_hints_history" not in refreshed:
+        refreshed["ai_hints_history"] = []
+        needs_update = True
+        
+    if needs_update:
         daily_state[category] = refreshed
         _set_daily_state(daily_state)
 
@@ -486,16 +499,21 @@ def start_game():
     word = word_data["word"]
     hint = word_data["hint"]
     learning_info = build_learning_info(word_data, category)
+    
+    # Automatically "guess" spaces and non-alpha characters
+    initial_guesses = list(set(c.upper() for c in word if not c.isalpha()))
+    
     session['word'] = word
     session['hint'] = hint
     session['category'] = category
     session['difficulty'] = difficulty
-    session['guesses'] = []
+    session['guesses'] = initial_guesses
     session['attempts_left'] = attempts
     session['game_over'] = False
     session['win'] = False
     session['learning_info'] = learning_info
     session['ai_hints_used'] = 0
+    session['ai_hints_history'] = []
     session['mode'] = 'random'  # Set mode to random
     
     # Clear daily-specific session data
@@ -506,10 +524,10 @@ def start_game():
         "mode": "random",
         "category": category,
         "difficulty": difficulty,
-        "masked_word": get_masked_word(word, []),
+        "masked_word": get_masked_word(word, initial_guesses),
         "attempts_left": attempts,
         "max_attempts": attempts,
-        "guesses": [],
+        "guesses": initial_guesses,
         "game_over": False,
         "win": False,
         "hint": hint,
@@ -583,7 +601,7 @@ def daily_guess():
     category = data.get("category", session.get("category", "Technology"))
     letter = (data.get('letter', '') or '').upper()
 
-    if not letter or len(letter) != 1 or not letter.isalpha():
+    if not letter or len(letter) != 1 or (not letter.isalpha() and letter != ' '):
         return jsonify({"error": "Invalid input"}), 400
 
     game = _ensure_daily_game(category)
@@ -652,7 +670,7 @@ def guess_letter():
     data = request.json
     letter = data.get('letter', '').upper()
     
-    if not letter or len(letter) != 1 or not letter.isalpha():
+    if not letter or len(letter) != 1 or (not letter.isalpha() and letter != ' '):
         return jsonify({"error": "Invalid input"}), 400
         
     guesses = session.get('guesses', [])
@@ -742,26 +760,51 @@ def generate_ai_hint():
     masked_word = get_masked_word(word, guesses)
     attempts_left = session.get('attempts_left', 6)
     
+    # Handle daily mode history
+    if session.get('mode') == 'daily':
+        daily_state = _get_daily_state()
+        category_state = daily_state.get(category, {})
+        previous_hints = category_state.get('ai_hints_history', [])
+    else:
+        previous_hints = session.get('ai_hints_history', [])
+    
     try:
         client = ClaudeClient()
         
         # Build a contextual prompt
+        history_context = ""
+        if previous_hints:
+            history_context = "Avoid repeating these previous hints: " + " | ".join(previous_hints)
+
         prompt = f"""CRITICAL: You must give a hint about the EXACT word "{word}". Do not confuse it with other words.
 
 THE WORD IS: {word}
 Category: {category}
 Current progress: {masked_word}
+{history_context}
 
 Provide a factually accurate hint that uniquely describes "{word}" and ONLY "{word}". 
 If the word is "{word}", your hint must be specifically about "{word}".
-Maximum 12 words. Start directly with the hint - no preambles."""
+Maximum 12 words. Start directly with the hint - no preambles. Make this hint different from any previous ones."""
         
         hint = client.generate_text(
             prompt=prompt,
             max_tokens=80,
-            temperature=0.3,
-            system=f"CRITICAL INSTRUCTION: Give a hint specifically and exclusively about the word '{word}'. Double-check your hint is about '{word}' and not any other word. Be factually accurate. No preambles."
+            temperature=0.7,  # Increased temperature for more variety
+            system=f"CRITICAL INSTRUCTION: Give a hint specifically and exclusively about the word '{word}'. Double-check your hint is about '{word}' and not any other word. Be factually accurate. No preambles. Provide a unique perspective compared to previous hints."
         )
+        
+        # Store hint in history
+        previous_hints.append(hint)
+        history_to_save = previous_hints[-5:]
+        
+        if session.get('mode') == 'daily':
+            daily_state = _get_daily_state()
+            if category in daily_state:
+                daily_state[category]['ai_hints_history'] = history_to_save
+                _set_daily_state(daily_state)
+        else:
+            session['ai_hints_history'] = history_to_save
         
         return jsonify({'hint': hint, 'success': True})
         

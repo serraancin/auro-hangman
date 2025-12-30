@@ -1153,6 +1153,8 @@ async function fetchCategories() {
 function createKeyboard() {
     const keyboard = document.getElementById('keyboard');
     keyboard.innerHTML = '';
+    
+    // Create A-Z buttons
     for (let i = 65; i <= 90; i++) {
         const letter = String.fromCharCode(i);
         const btn = document.createElement('button');
@@ -1163,6 +1165,15 @@ function createKeyboard() {
         btn.onclick = () => makeGuess(letter);
         keyboard.appendChild(btn);
     }
+    
+    // Add Space button for multi-word phrases
+    const spaceBtn = document.createElement('button');
+    spaceBtn.textContent = 'SPACE';
+    spaceBtn.classList.add('key-btn', 'space-btn');
+    spaceBtn.id = 'btn-SPACE';
+    spaceBtn.style.setProperty('--key-index', 26);
+    spaceBtn.onclick = () => makeGuess(' ');
+    keyboard.appendChild(spaceBtn);
 }
 
 // Physical keyboard support
@@ -1175,11 +1186,17 @@ function setupKeyboardInput() {
         
         const key = e.key.toUpperCase();
         
-        // Check if it's a letter A-Z
+        // Check if it's a letter A-Z or Space
         if (/^[A-Z]$/.test(key)) {
             const btn = document.getElementById(`btn-${key}`);
             if (btn && !btn.disabled) {
                 makeGuess(key);
+            }
+        } else if (e.key === ' ') {
+            e.preventDefault(); // Prevent scrolling
+            const btn = document.getElementById('btn-SPACE');
+            if (btn && !btn.disabled) {
+                makeGuess(' ');
             }
         }
     });
@@ -1406,7 +1423,8 @@ async function makeGuess(letter) {
         }
         
         // Update the specific button immediately
-        const btn = document.getElementById(`btn-${letter}`);
+        const btnId = letter === ' ' ? 'btn-SPACE' : `btn-${letter}`;
+        const btn = document.getElementById(btnId);
         if (btn) {
             btn.disabled = true;
             if (isCorrect) {
@@ -1667,7 +1685,8 @@ async function copyResults() {
 
 function updateKeyboard(guesses, maskedWord) {
     guesses.forEach(letter => {
-        const btn = document.getElementById(`btn-${letter}`);
+        const btnId = letter === ' ' ? 'btn-SPACE' : `btn-${letter}`;
+        const btn = document.getElementById(btnId);
         if (btn) {
             btn.disabled = true;
             if (maskedWord.includes(letter)) {
