@@ -296,6 +296,51 @@ Double-check your content is about "{word}" before responding."""
         }
 
 
+def generate_custom_words_with_ai(topic, difficulty):
+    """Generate a list of words for a custom topic using Claude AI."""
+    try:
+        client = ClaudeClient()
+        diff_settings = DIFFICULTY_SETTINGS.get(difficulty, DIFFICULTY_SETTINGS['medium'])
+        min_len, max_len = diff_settings['word_length']
+        
+        prompt = f"""Generate 5 educational words or short phrases related to the topic: "{topic}".
+        
+        Requirements:
+        1. Each word/phrase must be between {min_len} and {max_len} characters long (excluding spaces).
+        2. Provide a short, helpful hint for each.
+        3. The words should be appropriate for a K-8 student.
+        
+        Respond in this exact JSON format:
+        {{
+            "words": [
+                {{"word": "WORD1", "hint": "Hint for word 1"}},
+                {{"word": "WORD2", "hint": "Hint for word 2"}},
+                ...
+            ]
+        }}
+        """
+        
+        response = client.generate_text(
+            prompt=prompt,
+            max_tokens=500,
+            temperature=0.7,
+            system="You are an educational game designer. Respond ONLY with the requested JSON."
+        )
+        
+        # Clean response in case of markdown blocks
+        clean_response = response.strip()
+        if clean_response.startswith("```json"):
+            clean_response = clean_response[7:]
+        if clean_response.endswith("```"):
+            clean_response = clean_response[:-3]
+            
+        data = json.loads(clean_response)
+        return data.get("words", [])
+    except Exception as e:
+        print(f"Failed to generate custom words with AI: {e}")
+        return []
+
+
 def build_learning_info(word_data, category_name):
     if not word_data:
         return None
@@ -464,9 +509,7 @@ def start_game():
     data = request.json or {}
     category = data.get('category', 'Technology')
     difficulty = data.get('difficulty', 'medium')
-    
-    if category not in CATEGORIES:
-        category = 'Technology'
+    custom_topic = data.get('custom_topic')
     
     if difficulty not in DIFFICULTY_SETTINGS:
         difficulty = 'medium'
@@ -475,9 +518,19 @@ def start_game():
     diff_settings = DIFFICULTY_SETTINGS[difficulty]
     min_len, max_len = diff_settings['word_length']
     attempts = diff_settings['attempts']
+
+    if category == 'Custom' and custom_topic:
+        available_words = generate_custom_words_with_ai(custom_topic, difficulty)
+        if not available_words:
+            return jsonify({'error': 'Failed to generate words for this topic. Try another one!'}), 500
+        category = f"AI: {custom_topic}"
+    elif category not in CATEGORIES:
+        category = 'Technology'
+        available_words = CATEGORIES[category]
+    else:
+        available_words = CATEGORIES[category]
     
     # Filter words by difficulty (word length)
-    available_words = CATEGORIES[category]
     filtered_words = [w for w in available_words if min_len <= len(w["word"].replace(' ', '')) <= max_len]
     
     # Fallback to all words if no matches

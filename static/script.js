@@ -979,6 +979,11 @@ const categoryThemes = {
         themeClass: 'theme-history',
         bgImage: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&q=80'
     },
+    'Custom': {
+        icon: '✨',
+        themeClass: 'theme-ai',
+        bgImage: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1920&q=80'
+    },
     'default': {
         icon: '🎮',
         themeClass: '',
@@ -987,8 +992,33 @@ const categoryThemes = {
 };
 
 function updateCategoryTheme() {
-    const category = document.getElementById('category-select').value;
-    const theme = categoryThemes[category] || categoryThemes['default'];
+    const select = document.getElementById('category-select');
+    if (!select) return;
+    
+    let category = select.value;
+    if (!category) return;
+    
+    // Handle AI-generated categories for theme matching
+    let themeKey = category;
+    if (category.startsWith('AI: ')) {
+        themeKey = 'Custom';
+    }
+    
+    const theme = categoryThemes[themeKey] || categoryThemes['default'];
+    
+    // Show/hide custom topic input
+    const customContainer = document.getElementById('custom-topic-container');
+    if (customContainer) {
+        const isCustom = category === 'Custom';
+        customContainer.style.display = isCustom ? 'flex' : 'none';
+        
+        if (isCustom) {
+            const input = document.getElementById('custom-topic-input');
+            if (input) {
+                setTimeout(() => input.focus(), 100);
+            }
+        }
+    }
     
     // Update icon
     const iconEl = document.getElementById('category-icon');
@@ -1019,7 +1049,7 @@ function updateCategoryTheme() {
     const overlayEl = document.getElementById('bg-overlay');
     if (overlayEl) {
         // Remove all theme classes
-        overlayEl.classList.remove('theme-technology', 'theme-animals', 'theme-fruits', 'theme-countries', 'theme-sports', 'theme-science', 'theme-history');
+        overlayEl.classList.remove('theme-technology', 'theme-animals', 'theme-fruits', 'theme-countries', 'theme-sports', 'theme-science', 'theme-history', 'theme-ai');
         if (theme.themeClass) {
             overlayEl.classList.add(theme.themeClass);
         }
@@ -1028,7 +1058,7 @@ function updateCategoryTheme() {
     // Update container theme
     const container = document.querySelector('.container');
     if (container) {
-        container.classList.remove('theme-technology', 'theme-animals', 'theme-fruits', 'theme-countries', 'theme-sports', 'theme-science', 'theme-history');
+        container.classList.remove('theme-technology', 'theme-animals', 'theme-fruits', 'theme-countries', 'theme-sports', 'theme-science', 'theme-history', 'theme-ai');
         if (theme.themeClass) {
             container.classList.add(theme.themeClass);
         }
@@ -1147,6 +1177,15 @@ async function fetchCategories() {
             option.textContent = cat;
             select.appendChild(option);
         });
+    } finally {
+        // ALWAYS add Custom AI Topic option at the end if not already there
+        const existingCustom = Array.from(select.options).find(opt => opt.value === 'Custom');
+        if (!existingCustom) {
+            const customOption = document.createElement('option');
+            customOption.value = 'Custom';
+            customOption.textContent = '✨ Custom AI Topic...';
+            select.appendChild(customOption);
+        }
     }
 }
 
@@ -1205,6 +1244,13 @@ function setupKeyboardInput() {
 async function startNewGame() {
     const category = document.getElementById('category-select').value;
     const difficulty = document.getElementById('difficulty-select').value;
+    const customTopic = document.getElementById('custom-topic-input').value;
+    
+    if (category === 'Custom' && !customTopic.trim()) {
+        alert('Please enter a topic for the AI to generate words!');
+        return;
+    }
+
     currentDifficulty = difficulty;
     updateCategoryTheme(); // Update theme when starting new game
     
@@ -1219,14 +1265,31 @@ async function startNewGame() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ category, difficulty })
+            body: JSON.stringify({ 
+                category, 
+                difficulty,
+                custom_topic: customTopic
+            })
         });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            alert(err.error || 'Failed to start game');
+            return;
+        }
+
         const data = await response.json();
         currentMode = 'random';
         localStorage.setItem('hangman_mode', 'random');
         resetHintUI();
         updateUI(data);
         resetKeyboard();
+        
+        // If it was a custom game, update the badge to show the topic
+        if (category === 'Custom') {
+            const badgeEl = document.getElementById('category-badge');
+            if (badgeEl) badgeEl.textContent = `AI: ${customTopic}`;
+        }
     } catch (error) {
         console.error('Error starting game:', error);
     }
@@ -1573,6 +1636,26 @@ function updateUI(data) {
     // Update category select if it doesn't match current game (e.g. on page reload)
     if (data.category) {
         const select = document.getElementById('category-select');
+        
+        // Check if the category exists in the dropdown
+        let optionExists = Array.from(select.options).some(opt => opt.value === data.category);
+        
+        if (!optionExists) {
+            // If it's an AI category, we might want to add it or map it to Custom
+            if (data.category.startsWith('AI: ')) {
+                const newOpt = document.createElement('option');
+                newOpt.value = data.category;
+                newOpt.textContent = '✨ ' + data.category;
+                // Insert before "Custom" if possible
+                const customOpt = Array.from(select.options).find(opt => opt.value === 'Custom');
+                if (customOpt) {
+                    select.insertBefore(newOpt, customOpt);
+                } else {
+                    select.appendChild(newOpt);
+                }
+            }
+        }
+        
         if (select.value !== data.category) {
             select.value = data.category;
         }

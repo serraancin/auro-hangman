@@ -103,8 +103,11 @@
                             <option value="hard">🔴 Hard</option>
                         </select>
                         <select id="category-select" onchange="updateCategoryTheme()">
-                            <!-- Options will be populated by JS -->
+                            <option value="" disabled selected>Loading categories...</option>
                         </select>
+                        <div id="custom-topic-container" style="display: none;">
+                            <input type="text" id="custom-topic-input" placeholder="Enter any topic (e.g. Dinosaurs)" class="custom-topic-input">
+                        </div>
                         <label class="timer-toggle-label">
                             <input type="checkbox" id="timer-toggle" onchange="toggleTimerMode()">
                             <span>⏱️ Timer</span>
