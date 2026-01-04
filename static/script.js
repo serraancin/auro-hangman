@@ -933,6 +933,201 @@ function toggleSound() {
     if (soundEnabled) playSound('click');
 }
 
+// Voice and Speech Features
+let voiceEnabled = false;
+let recognition = null;
+let isSpeaking = false;
+
+function speak(text) {
+    if (!window.speechSynthesis) return;
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.1; // Slightly higher pitch for a friendlier kid-friendly voice
+    
+    utterance.onstart = () => { isSpeaking = true; };
+    utterance.onend = () => { isSpeaking = false; };
+    
+    window.speechSynthesis.speak(utterance);
+}
+
+function toggleVoice() {
+    voiceEnabled = !voiceEnabled;
+    const btn = document.getElementById('voice-toggle');
+    
+    if (voiceEnabled) {
+        startVoiceRecognition();
+        if (btn) {
+            btn.classList.add('active');
+            btn.title = "Voice On - Listening...";
+        }
+        speak("Voice recognition activated. You can say a letter or the whole word.");
+    } else {
+        stopVoiceRecognition();
+        if (btn) {
+            btn.classList.remove('active');
+            btn.title = "Voice Off";
+        }
+        speak("Voice recognition deactivated.");
+    }
+}
+
+function startVoiceRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Sorry, your browser doesn't support voice recognition.");
+        voiceEnabled = false;
+        return;
+    }
+
+    if (!recognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event) => {
+            const last = event.results.length - 1;
+            const text = event.results[last][0].transcript.trim().toUpperCase();
+            console.log('Recognized voice:', text);
+            
+            processVoiceInput(text);
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            if (event.error === 'not-allowed') {
+                alert("Microphone access denied. Please enable it in your browser settings.");
+                toggleVoice();
+            } else if (event.error === 'network') {
+                console.log("Network error in speech recognition. Retrying...");
+            } else if (event.error === 'no-speech') {
+                // This is common, just ignore and let onend restart it
+                console.log("No speech detected, restarting...");
+            }
+        };
+
+        recognition.onend = () => {
+            if (voiceEnabled) {
+                // Small delay before restarting to prevent browser lock-up
+                setTimeout(() => {
+                    if (voiceEnabled) {
+                        try {
+                            recognition.start();
+                        } catch (e) {
+                            console.log("Failed to restart recognition:", e);
+                        }
+                    }
+                }, 300);
+            }
+        };
+    }
+
+    try {
+        recognition.start();
+    } catch (e) {
+        console.log("Recognition already started");
+    }
+}
+
+function stopVoiceRecognition() {
+    if (recognition) {
+        recognition.stop();
+    }
+}
+
+function processVoiceInput(text) {
+    // Ignore voice input while the app is speaking to prevent self-triggering
+    if (isSpeaking) return;
+
+    const originalText = text;
+    text = text.trim().toUpperCase();
+    
+    // Show a small visual feedback for what was heard
+    showVoiceFeedback(originalText);
+
+    // 1. Check if it's a single letter (e.g., "A", "B", "See")
+    if (text.length === 1 && /^[A-Z]$/.test(text)) {
+        makeGuess(text);
+        return;
+    }
+
+    // 2. Handle common phonetic mistakes or word-based letters
+    const phoneticMap = {
+        'ALPHA': 'A', 'BEE': 'B', 'SEE': 'C', 'SEA': 'C', 'DELTA': 'D', 'ECHO': 'E', 
+        'FOXTROT': 'F', 'GOLF': 'G', 'HOTEL': 'H', 'INDIA': 'I', 'EYE': 'I', 'JULIET': 'J', 
+        'KILO': 'K', 'LIMA': 'L', 'MIKE': 'M', 'NOVEMBER': 'N', 'OSCAR': 'O', 'PAPA': 'P', 
+        'QUEBEC': 'Q', 'ROMEO': 'R', 'ARE': 'R', 'SIERRA': 'S', 'TANGO': 'T', 'TEA': 'T', 
+        'UNIFORM': 'U', 'YOU': 'U', 'VICTOR': 'V', 'WHISKEY': 'W', 'X-RAY': 'X', 'YANKEE': 'Y', 
+        'WHY': 'Y', 'ZULU': 'Z', 'ZEE': 'Z', 'APPLE': 'A', 'BOY': 'B', 'CAT': 'C', 'DOG': 'D'
+    };
+
+    if (phoneticMap[text]) {
+        makeGuess(phoneticMap[text]);
+        return;
+    }
+
+    // 3. Extract letter from phrases like "Letter A" or "Guess B"
+    const letterMatch = text.match(/(?:LETTER|GUESS|CHOOSE|IS IT|SAY)\s+([A-Z])/);
+    if (letterMatch && letterMatch[1]) {
+        makeGuess(letterMatch[1]);
+        return;
+    }
+
+    // 4. Check if they said "Space"
+    if (text.includes('SPACE')) {
+        makeGuess(' ');
+        return;
+    }
+
+    // 5. If they say "Hint", trigger AI hint
+    if (text.includes("HINT")) {
+        showAIHint();
+        return;
+    }
+    
+    // 6. If they say "New Game", start a new game
+    if (text.includes("NEW GAME") || text.includes("RESTART")) {
+        startNewGame();
+        return;
+    }
+}
+
+function showVoiceFeedback(text) {
+    let feedbackEl = document.getElementById('voice-feedback');
+    if (!feedbackEl) {
+        feedbackEl = document.createElement('div');
+        feedbackEl.id = 'voice-feedback';
+        feedbackEl.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(108, 92, 231, 0.9);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            z-index: 1000;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        `;
+        document.body.appendChild(feedbackEl);
+    }
+    
+    feedbackEl.textContent = `🎤 Heard: "${text}"`;
+    feedbackEl.style.opacity = '1';
+    
+    if (window.voiceFeedbackTimeout) clearTimeout(window.voiceFeedbackTimeout);
+    window.voiceFeedbackTimeout = setTimeout(() => {
+        feedbackEl.style.opacity = '0';
+    }, 2000);
+}
+
 let currentMode = 'random';
 let lastGameData = null;
 let currentLearningInfo = null;
@@ -1375,6 +1570,10 @@ async function showAIHint() {
             // Enable button so it can be clicked to hide
             aiHintBtn.disabled = false;
             aiHintBtn.textContent = '👁️ Hide Hint';
+            
+            if (voiceEnabled) {
+                speak(`AI Hint: ${data.hint}`);
+            }
         } else {
             aiHintText.textContent = `❌ ${data.error || 'Could not generate hint'}`;
             aiHintText.classList.add('hint-error');
@@ -1585,16 +1784,25 @@ function showCurriculumFact(info) {
     if (!container || !textEl) return;
 
     const segments = [];
+    const speechSegments = [];
+    
     if (info.definition) {
         segments.push(`<strong>Definition:</strong> ${info.definition}`);
+        speechSegments.push(`Definition: ${info.definition}`);
     }
     if (info.fun_fact) {
         segments.push(`<strong>Fun fact:</strong> ${info.fun_fact}`);
+        speechSegments.push(`Fun fact: ${info.fun_fact}`);
     }
     // Removed essential_question to save space
 
     textEl.innerHTML = segments.join('<br>');
     container.style.display = 'block';
+    
+    // Speak the fact if voice is enabled
+    if (voiceEnabled) {
+        speak(speechSegments.join('. '));
+    }
 }
 
 function updateUI(data) {
@@ -1680,6 +1888,9 @@ function updateUI(data) {
     const hintEl = document.getElementById('hint-text');
     if (hintEl && data.hint) {
         hintEl.textContent = `Hint: ${data.hint}`;
+        if (voiceEnabled && !data.game_over && data.attempts_left === 6) {
+            speak(`The category is ${data.category}. Here is your hint: ${data.hint}`);
+        }
     }
 
     if (data.learning) {
@@ -1696,9 +1907,11 @@ function updateUI(data) {
             messageEl.textContent = "You Won! 🎉";
             messageEl.style.color = "green";
             triggerWinConfetti();
+            if (voiceEnabled) speak("You won! Great job!");
         } else {
             messageEl.textContent = `Game Over! The word was ${data.word}`;
             messageEl.style.color = "red";
+            if (voiceEnabled) speak(`Game over. The word was ${data.word}. Better luck next time!`);
         }
         disableAllButtons();
 
@@ -1938,6 +2151,9 @@ async function fetchFunFact(word, fallbackHint) {
     const showFact = (text) => {
         textEl.textContent = text;
         container.style.display = 'block';
+        if (voiceEnabled) {
+            speak(text);
+        }
     };
 
     try {

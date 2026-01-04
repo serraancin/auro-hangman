@@ -571,10 +571,16 @@ h1 {
 }
 
 /* Sound toggle button */
-.sound-toggle {
+.top-controls {
     position: fixed;
     top: 20px;
     right: 20px;
+    display: flex;
+    gap: 10px;
+    z-index: 100;
+}
+
+.sound-toggle, .voice-toggle {
     width: 50px;
     height: 50px;
     border-radius: 50%;
@@ -584,11 +590,25 @@ h1 {
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     transition: all 0.3s ease;
-    z-index: 100;
     backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-.sound-toggle:hover {
+.voice-toggle.active {
+    background: var(--primary-color);
+    color: white;
+    animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(108, 92, 231, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(108, 92, 231, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(108, 92, 231, 0); }
+}
+
+.sound-toggle:hover, .voice-toggle:hover {
     transform: scale(1.1);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
 }
