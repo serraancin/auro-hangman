@@ -69,6 +69,24 @@ load_dotenv()
 - ✅ Separate `.env.example` for documentation
 - ✅ Server-side API calls (keys never exposed to client)
 
+### 3. Custom AI Category Generation
+- **Function**: `generate_custom_words_with_ai()`
+- **Technology**: Claude API with JSON-mode prompts
+- **Features**:
+  - Allows users to enter ANY topic (e.g., "80s Movies", "Quantum Physics")
+  - Claude generates a curated list of words and hints for that specific topic
+  - Dynamic theme switching (AI-themed purple gradient) for custom games
+  - Seamlessly integrates LLM-generated content into the core game loop
+
+### 4. Voice-to-Text & Text-to-Speech
+- **Technology**: Web Speech API (SpeechRecognition & SpeechSynthesis)
+- **Features**:
+  - **Voice Input**: Hands-free gameplay. Say letters ("A", "B"), phonetic words ("Alpha", "Bravo"), or commands ("Hint", "New Game").
+  - **Auto-Recovery**: Self-healing microphone logic that restarts automatically after silence or errors.
+  - **Interactive Speech**: The app reads out hints, game results, and educational facts aloud.
+  - **Echo Prevention**: Intelligent muting while the app is speaking to prevent self-triggering.
+  - **Visual Feedback**: Real-time "Heard" bubble showing what the app recognized.
+
 ## 🏗️ Technical Architecture
 
 ```
@@ -265,11 +283,11 @@ The AI integration provides:
 ## 🔮 Future Enhancements
 
 Potential AI integrations:
-- [ ] Speech-to-text for voice input
+- [x] Speech-to-text for voice input
+- [x] AI-generated custom word categories
 - [ ] Difficulty adjustment based on player performance
 - [ ] Multilingual support with AI translation
 - [ ] Personalized word recommendations
-- [ ] AI-generated custom word categories
 - [ ] Natural language explanations for incorrect guesses
 
 ## 🤝 Contributing
