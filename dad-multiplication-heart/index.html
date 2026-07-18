@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Best Dad Ever Multiplication Heart</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:Arial,sans-serif;background:#fff3f8;color:#333;display:flex;justify-content:center;align-items:flex-start;padding:18px;transition:background 1s ease;overflow-x:hidden}
+body.finished{background:#ff86b5}
+.game{width:min(900px,100%);text-align:center;position:relative;z-index:2}
+h1{margin:4px 0 8px;color:#d83e83}.subtitle{margin:0 0 16px}
+.layout{display:flex;justify-content:center;align-items:flex-start;gap:22px;flex-wrap:wrap}
+.card{background:white;border-radius:20px;padding:18px;box-shadow:0 8px 22px rgba(0,0,0,.12)}
+#heartBoard{display:grid;grid-template-columns:repeat(7,52px);gap:6px}
+.cell{width:52px;height:52px;border-radius:10px;display:flex;justify-content:center;align-items:center;font-size:13px;font-weight:bold;user-select:none}
+.empty{visibility:hidden}.piece{border:2px solid #d8c1cd;background:#fff;cursor:pointer;transition:.15s ease}.piece:hover{transform:scale(1.05)}
+.piece.unlocked{border-color:#21a566;background:#e8fff1;box-shadow:0 0 0 3px rgba(33,165,102,.12)}
+.piece.colored{color:transparent;border-color:transparent}
+.controls{width:300px}#question{font-size:31px;font-weight:bold;margin:12px 0}
+input{width:105px;padding:10px;font-size:20px;text-align:center;border:2px solid #ddd;border-radius:11px}
+.mainButton{padding:11px 15px;border:none;border-radius:11px;background:#e55398;color:white;font-weight:bold;cursor:pointer;margin:5px}
+#message{min-height:24px;margin-top:9px;font-weight:bold}
+#colors{display:flex;justify-content:center;flex-wrap:wrap;gap:7px}.colorButton{width:40px;height:40px;border-radius:50%;border:3px solid transparent;cursor:pointer}.colorButton.selected{border-color:#222}
+#progress{font-weight:bold}
+#surprise{display:none;margin:22px auto 0;padding:24px;border-radius:22px;background:rgba(255,255,255,.97);box-shadow:0 10px 30px rgba(0,0,0,.18);max-width:650px;animation:pop .7s ease}
+#surprise h2{font-size:46px;margin:4px 0 8px;color:#d61f72}#surprise .hearts{font-size:34px;line-height:1.5}
+@keyframes pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10}.floating-heart{position:fixed;bottom:-40px;font-size:30px;animation:floatUp 4s linear forwards;z-index:8;pointer-events:none}
+@keyframes floatUp{0%{transform:translateY(0) scale(.7);opacity:0}15%{opacity:1}100%{transform:translateY(-115vh) scale(1.4) rotate(20deg);opacity:0}}
+@media(max-width:600px){#heartBoard{grid-template-columns:repeat(7,40px);gap:4px}.cell{width:40px;height:40px;font-size:10px}.card{padding:13px}#surprise h2{font-size:36px}}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div class="game">
+<h1>Dad's Multiplication Heart</h1>
+<p class="subtitle">Solve the multiplication fact, then click the green square to color it.</p>
+<div class="layout">
+<div class="card"><div id="heartBoard"></div></div>
+<div class="card controls">
+<h2>Solve</h2><div id="question"></div>
+<input id="answer" type="number" inputmode="numeric" aria-label="Your answer">
+<button class="mainButton" id="checkButton">Check</button>
+<div id="message"></div>
+<h3>Choose a color</h3><div id="colors"></div>
+<p id="progress"></p><button class="mainButton" id="restartButton">Restart</button>
+</div></div>
+<div id="surprise"><div class="hearts">💗 💖 💕 ❤️ 💓 💞 💘</div><h2>BEST DAD EVER</h2><div class="hearts">❤️ 💕 💗 💖 💘 💞 💓</div></div>
+</div>
+<script>
+(function(){
+const shape=[[0,1,1,0,1,1,0],[1,1,1,1,1,1,1],[0,1,1,1,1,1,0],[0,0,1,1,1,0,0],[0,0,0,1,0,0,0]];
+const facts=[[2,2],[2,3],[2,4],[2,5],[3,2],[3,3],[3,4],[3,5],[4,2],[4,3],[4,4],[4,5],[5,2],[5,3],[5,4],[5,5],[6,2],[6,3],[6,4],[6,5]];
+const palette=['#ff4f91','#ff8fb5','#ffb347','#ffd93d','#74d680','#6db8ff','#aa8cff'];
+const board=document.getElementById('heartBoard'),question=document.getElementById('question'),answer=document.getElementById('answer'),message=document.getElementById('message'),colorsBox=document.getElementById('colors'),progress=document.getElementById('progress'),surprise=document.getElementById('surprise'),checkButton=document.getElementById('checkButton'),restartButton=document.getElementById('restartButton');
+let current=0,colored=0,selectedColor=palette[0],pieces=[];
+function buildGame(){board.innerHTML='';colorsBox.innerHTML='';current=0;colored=0;pieces=[];selectedColor=palette[0];surprise.style.display='none';surprise.innerHTML='<div class="hearts">💗 💖 💕 ❤️ 💓 💞 💘</div><h2>BEST DAD EVER</h2><div class="hearts">❤️ 💕 💗 💖 💘 💞 💓</div>';document.body.classList.remove('finished');message.textContent='';let index=0;shape.forEach(row=>row.forEach(value=>{const cell=document.createElement('div');cell.className='cell';if(value===0){cell.classList.add('empty')}else{cell.classList.add('piece');const fact=facts[index];cell.textContent=fact[0]+'×'+fact[1];cell.dataset.unlocked='false';cell.dataset.colored='false';cell.addEventListener('click',()=>{if(cell.dataset.unlocked!=='true'||cell.dataset.colored==='true')return;cell.style.background=selectedColor;cell.classList.add('colored');cell.dataset.colored='true';colored++;updateProgress();if(colored===pieces.length)finishGame()});pieces.push(cell);index++}board.appendChild(cell)}));palette.forEach((color,index)=>{const button=document.createElement('button');button.className='colorButton'+(index===0?' selected':'');button.style.background=color;button.setAttribute('aria-label','Choose color');button.addEventListener('click',()=>{selectedColor=color;document.querySelectorAll('.colorButton').forEach(btn=>btn.classList.remove('selected'));button.classList.add('selected')});colorsBox.appendChild(button)});showQuestion();updateProgress()}
+function showQuestion(){if(current>=pieces.length){question.textContent='All unlocked!';answer.value='';return}const fact=facts[current];question.textContent=fact[0]+' × '+fact[1]+' = ?';answer.value='';answer.focus()}
+function checkAnswer(){if(current>=pieces.length)return;const fact=facts[current],userAnswer=Number(answer.value);if(answer.value!==''&&userAnswer===fact[0]*fact[1]){const cell=pieces[current];cell.dataset.unlocked='true';cell.classList.add('unlocked');message.textContent='Correct! Click the green square to color it.';message.style.color='#16804e';current++;showQuestion()}else{message.textContent='Try again!';message.style.color='#d32653';answer.select()}}
+function updateProgress(){progress.textContent='Colored: '+colored+' / '+pieces.length}
+function finishGame(){document.body.classList.add('finished');surprise.style.display='block';message.textContent='You finished the heart! 🎉';message.style.color='#d61f72';launchConfetti();launchHearts()}
+function launchHearts(){const hearts=['❤️','💗','💖','💕','💞','💘','💓'];let count=0;const timer=setInterval(()=>{const heart=document.createElement('div');heart.className='floating-heart';heart.textContent=hearts[Math.floor(Math.random()*hearts.length)];heart.style.left=Math.random()*95+'vw';heart.style.animationDuration=(3+Math.random()*2)+'s';document.body.appendChild(heart);setTimeout(()=>heart.remove(),5200);count++;if(count>45)clearInterval(timer)},100)}
+function launchConfetti(){const canvas=document.getElementById('confetti'),ctx=canvas.getContext('2d');canvas.width=innerWidth;canvas.height=innerHeight;const confetti=Array.from({length:180},()=>({x:Math.random()*canvas.width,y:-20-Math.random()*canvas.height,w:6+Math.random()*8,h:8+Math.random()*10,speed:2+Math.random()*5,drift:-2+Math.random()*4,rotation:Math.random()*Math.PI,rotationSpeed:-.15+Math.random()*.3,color:['#ff2f85','#ffffff','#ffd93d','#ff8ab8','#8c52ff','#ff5e5e'][Math.floor(Math.random()*6)]}));let frames=0;function animate(){ctx.clearRect(0,0,canvas.width,canvas.height);confetti.forEach(c=>{c.y+=c.speed;c.x+=c.drift;c.rotation+=c.rotationSpeed;ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.rotation);ctx.fillStyle=c.color;ctx.fillRect(-c.w/2,-c.h/2,c.w,c.h);ctx.restore();if(c.y>canvas.height+20){c.y=-20;c.x=Math.random()*canvas.width}});frames++;if(frames<420)requestAnimationFrame(animate);else ctx.clearRect(0,0,canvas.width,canvas.height)}animate()}
+checkButton.addEventListener('click',checkAnswer);restartButton.addEventListener('click',buildGame);answer.addEventListener('keydown',e=>{if(e.key==='Enter')checkAnswer()});buildGame();
+})();
+</script>
+</body>
+</html>
